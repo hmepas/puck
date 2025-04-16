@@ -19,10 +19,7 @@ let package = Package(
             dependencies: [
                 .product(name: "Logging", package: "swift-log")
             ],
-            path: "Sources/PuckCore",
-            resources: [
-                .copy("../Puck/com.puck.daemon.plist")
-            ]
+            path: "Sources/PuckCore"
         ),
         // CLI module
         .executableTarget(
@@ -31,7 +28,10 @@ let package = Package(
                 "PuckCore",
                 .product(name: "ArgumentParser", package: "swift-argument-parser")
             ],
-            path: "Sources/Puck"
+            path: "Sources/Puck",
+            resources: [
+                .copy("com.puck.daemon.plist")
+            ]
         ),
         // Tests
         .testTarget(
