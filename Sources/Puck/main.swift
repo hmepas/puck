@@ -30,13 +30,7 @@ struct Puck: ParsableCommand {
     
     private lazy var serviceManager: ServiceManager = {
         // Load plist content
-        let plistContent: String
-        do {
-            plistContent = try ResourceLoader.loadPlistContent()
-        } catch {
-            fatalError("Could not load plist file: \(error)")
-        }
-        
+        let plistContent = ResourceLoader.loadPlistContent()
         let executablePath = ProcessInfo.processInfo.arguments[0]
         return ServiceManager(plistContent: plistContent, executablePath: executablePath)
     }()
