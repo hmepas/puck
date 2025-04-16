@@ -3,7 +3,6 @@ import PuckCore
 import ArgumentParser
 import Carbon
 
-@main
 struct Puck: ParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "puck",
@@ -72,37 +71,40 @@ struct Puck: ParsableCommand {
         }
         
         // Service management commands
+        let serviceManager = ServiceManager()
+        
         if installService {
             print("Installing launchd service...")
-            // TODO: Implement service installation
+            try serviceManager.install()
+            try serviceManager.start()
             return
         }
         
         if uninstallService {
             print("Uninstalling launchd service...")
-            // TODO: Implement service uninstallation
+            try serviceManager.uninstall()
             return
         }
         
         if startService {
             print("Starting service...")
-            // TODO: Implement service start
+            try serviceManager.start()
             return
         }
         
         if stopService {
             print("Stopping service...")
-            // TODO: Implement service stop
+            try serviceManager.stop()
             return
         }
         
         if restartService {
             print("Restarting service...")
-            // TODO: Implement service restart
+            try serviceManager.restart()
             return
         }
         
-        // Default behavior: start the daemon
+        // Default behavior: start in foreground if not running as service
         let configPath = config ?? "\(NSHomeDirectory())/.config/puck/puckrc"
         
         // Check if config file exists
@@ -114,7 +116,8 @@ struct Puck: ParsableCommand {
         
         do {
             let inputManager = try InputMethodManager(configPath: configPath)
-            print("Starting Puck daemon with configuration from \(configPath)")
+            print("Starting Puck in foreground mode with configuration from \(configPath)")
+            print("Use --install-service to run as a background service")
             
             guard inputManager.start() else {
                 print("Error: Failed to start input method manager. Make sure you have accessibility permissions enabled.")
@@ -127,4 +130,6 @@ struct Puck: ParsableCommand {
             print("Error: Failed to initialize input method manager: \(error)")
         }
     }
-} 
+}
+
+Puck.main() 
