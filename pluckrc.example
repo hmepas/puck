@@ -1,0 +1,6 @@
+# Switch to U.S. input source
+cmd + shift - space : com.apple.keylayout.US
+
+# Cycle between Russian and U.S. English
+ctrl - alt - p : com.apple.keylayout.Russian
+ctrl - alt - p : com.apple.keylayout.US
