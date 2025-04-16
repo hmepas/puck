@@ -12,18 +12,20 @@ Puck is a lightweight daemon for macOS designed to provide fast and configurable
 *   **Autostart:** Automatically configures itself to launch on login.
 *   **Modern macOS:** Built with Swift for optimal performance and integration.
 
-## Planned CLI Usage
+## CLI Usage
 
-*   `puck`: Installs the launch agent (if needed), starts the daemon, and detaches.
+*   `puck`: Installs and starts the service if not already running.
 *   `puck -l` or `puck --list`: Lists all available input source IDs configured on the system.
 *   `puck -o` or `puck --observe`: Enters a mode to observe and print key presses (names and modifiers) to help with configuration.
-*   `puck --install-service`: Installs the launchd service file.
-*   `puck --uninstall-service`: Removes the launchd service file.
-*   `puck --start-service`: Starts the launchd service.
-*   `puck --stop-service`: Stops the launchd service.
-*   `puck --restart-service`: Restarts the launchd service.
+*   `puck -f` or `puck --foreground`: Run in foreground mode without installing as a service.
+*   `puck -s` or `puck --status`: Show service status (installed and running state).
+*   `puck -u` or `puck --uninstall`: Uninstall the service.
 *   `puck -c <path>` or `puck --config <path>`: Use a specific configuration file path.
 *   `puck -v` or `puck --version`: Show version information.
+
+The default configuration file location is `~/.config/puck/puckrc`. You need to create this file before running the service.
+
+Note: The application requires accessibility permissions to function. You will be prompted to grant these permissions in System Settings -> Privacy & Security -> Accessibility when installing the service.
 
 ## Configuration (`~/.config/puck/puckrc`)
 
