@@ -5,13 +5,8 @@ public enum ResourceError: Error {
 }
 
 public struct ResourceLoader {
-    public static func loadPlistContent() throws -> String {
-        // Try environment variable
-        if let path = ProcessInfo.processInfo.environment["PUCK_RESOURCE_PATH"],
-           let content = try? String(contentsOfFile: path, encoding: .utf8) {
-            return content
-        }
-        
-        throw ResourceError.resourceNotFound("Could not find plist file")
+    public static func loadPlistContent() -> String {
+        let executablePath = ProcessInfo.processInfo.arguments[0]
+        return PlistTemplate.generate(executablePath: executablePath)
     }
 } 

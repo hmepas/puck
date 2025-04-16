@@ -34,76 +34,43 @@ public class ServiceManager {
     private let executablePath: String
     private let plistContent: String
     
-    public init(plistContent: String, executablePath: String? = nil) {
-        self.launchAgentPath = "\(NSHomeDirectory())/Library/LaunchAgents/\(launchAgentName).plist"
-        self.executablePath = executablePath ?? ProcessInfo.processInfo.arguments[0]
+    public init(plistContent: String, executablePath: String) {
         self.plistContent = plistContent
+        self.executablePath = executablePath
+        self.launchAgentPath = "\(NSHomeDirectory())/Library/LaunchAgents"
     }
     
     public func install() throws {
-        // Check accessibility permissions first
-        guard AXIsProcessTrusted() else {
-            print("Warning: Accessibility permissions are not granted.")
-            print("Please grant accessibility permissions in System Settings -> Privacy & Security -> Accessibility")
-            print("After granting permissions, try installing the service again.")
-            throw ServiceError.invalidState("Accessibility permissions required")
-        }
-        
         // Create LaunchAgents directory if it doesn't exist
-        try FileManager.default.createDirectory(
-            atPath: "\(NSHomeDirectory())/Library/LaunchAgents",
-            withIntermediateDirectories: true
-        )
+        try FileManager.default.createDirectory(atPath: launchAgentPath, withIntermediateDirectories: true, attributes: nil)
         
-        print("Debug: Using executable path: \(executablePath)")
+        let plistPath = (launchAgentPath as NSString).appendingPathComponent("\(launchAgentName).plist")
+        try PlistTemplate.generate(executablePath: executablePath).write(toFile: plistPath, atomically: true, encoding: .utf8)
         
-        // Get working directory (parent directory of executable)
-        let workingDirectory = (executablePath as NSString).deletingLastPathComponent
-        print("Debug: Using working directory: \(workingDirectory)")
-        
-        // Update plist content with correct paths
-        var plistDict = try PropertyListSerialization.propertyList(
-            from: plistContent.data(using: .utf8)!,
-            options: [],
-            format: nil
-        ) as! [String: Any]
-        
-        // Update paths
-        if var programArgs = plistDict["ProgramArguments"] as? [String] {
-            programArgs[0] = executablePath
-            plistDict["ProgramArguments"] = programArgs
+        let result = ProcessUtils.shell("launchctl", "load", plistPath)
+        if result.status != 0 {
+            throw ServiceError.commandFailed("Failed to load service: \(result.output)")
         }
-        plistDict["WorkingDirectory"] = workingDirectory
-        
-        // Convert back to XML
-        let updatedContent = try PropertyListSerialization.data(
-            fromPropertyList: plistDict,
-            format: .xml,
-            options: 0
-        )
-        
-        // Write updated plist
-        try updatedContent.write(to: URL(fileURLWithPath: launchAgentPath), options: .atomic)
-        
-        print("Service installed at \(launchAgentPath)")
     }
     
     public func uninstall() throws {
         try stop()
         
-        if FileManager.default.fileExists(atPath: launchAgentPath) {
-            try FileManager.default.removeItem(atPath: launchAgentPath)
+        let plistPath = (launchAgentPath as NSString).appendingPathComponent("\(launchAgentName).plist")
+        if FileManager.default.fileExists(atPath: plistPath) {
+            try FileManager.default.removeItem(atPath: plistPath)
         }
         
         print("Service uninstalled")
     }
     
     public func start() throws {
-        guard FileManager.default.fileExists(atPath: launchAgentPath) else {
+        let plistPath = (launchAgentPath as NSString).appendingPathComponent("\(launchAgentName).plist")
+        guard FileManager.default.fileExists(atPath: plistPath) else {
             throw ServiceError.invalidState("Service not installed. Please install first.")
         }
         
-        let result = ProcessUtils.shell("/bin/launchctl", "load", launchAgentPath)
+        let result = ProcessUtils.shell("launchctl", "load", plistPath)
         if result.status != 0 {
             throw ServiceError.commandFailed("Failed to start service: \(result.output)")
         }
@@ -112,11 +79,12 @@ public class ServiceManager {
     }
     
     public func stop() throws {
-        guard FileManager.default.fileExists(atPath: launchAgentPath) else {
+        let plistPath = (launchAgentPath as NSString).appendingPathComponent("\(launchAgentName).plist")
+        guard FileManager.default.fileExists(atPath: plistPath) else {
             return
         }
         
-        let result = ProcessUtils.shell("/bin/launchctl", "unload", launchAgentPath)
+        let result = ProcessUtils.shell("launchctl", "unload", plistPath)
         if result.status != 0 {
             throw ServiceError.commandFailed("Failed to stop service: \(result.output)")
         }
@@ -132,7 +100,8 @@ public class ServiceManager {
     }
     
     public func isInstalled() -> Bool {
-        return FileManager.default.fileExists(atPath: launchAgentPath)
+        let plistPath = (launchAgentPath as NSString).appendingPathComponent("\(launchAgentName).plist")
+        return FileManager.default.fileExists(atPath: plistPath)
     }
     
     public func isProcessRunning() -> Bool {
@@ -146,7 +115,7 @@ public class ServiceManager {
     public func isRunning() -> Bool {
         // If service is installed, check if it's actually running via launchctl
         if isInstalled() {
-            let result = ProcessUtils.shell("/bin/launchctl", "list")
+            let result = ProcessUtils.shell("launchctl", "list")
             
             // Parse launchctl output to find our service and its PID
             let serviceInfo = result.output.split(separator: "\n")

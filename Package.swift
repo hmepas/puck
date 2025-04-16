@@ -28,10 +28,7 @@ let package = Package(
                 "PuckCore",
                 .product(name: "ArgumentParser", package: "swift-argument-parser")
             ],
-            path: "Sources/Puck",
-            resources: [
-                .copy("com.puck.daemon.plist")
-            ]
+            path: "Sources/Puck"
         ),
         // Tests
         .testTarget(
