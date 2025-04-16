@@ -30,15 +30,11 @@ struct Puck: ParsableCommand {
     
     private lazy var serviceManager: ServiceManager = {
         // Load plist content
-        guard let plistURL = Bundle.module.url(forResource: "com.puck.daemon", withExtension: "plist") else {
-            fatalError("Could not find plist file in bundle")
-        }
-        
         let plistContent: String
         do {
-            plistContent = try String(contentsOf: plistURL, encoding: .utf8)
+            plistContent = try ResourceLoader.loadPlistContent()
         } catch {
-            fatalError("Could not read plist file: \(error)")
+            fatalError("Could not load plist file: \(error)")
         }
         
         let executablePath = ProcessInfo.processInfo.arguments[0]
