@@ -1,4 +1,5 @@
 import Foundation
+@_implementationOnly import Foundation
 
 public enum ResourceError: Error {
     case resourceNotFound(String)
