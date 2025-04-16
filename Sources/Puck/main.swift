@@ -19,23 +19,18 @@ struct Puck: ParsableCommand {
     @Option(name: .shortAndLong, help: "Use a specific configuration file path")
     var config: String?
     
-    @Flag(help: "Install the launchd service")
-    var installService = false
+    @Flag(name: .shortAndLong, help: "Run in foreground mode without detaching")
+    var foreground = false
     
-    @Flag(help: "Uninstall the launchd service")
-    var uninstallService = false
+    @Flag(name: .shortAndLong, help: "Show service status")
+    var status = false
     
-    @Flag(help: "Start the launchd service")
-    var startService = false
-    
-    @Flag(help: "Stop the launchd service")
-    var stopService = false
-    
-    @Flag(help: "Restart the launchd service")
-    var restartService = false
+    @Flag(name: .shortAndLong, help: "Uninstall the service")
+    var uninstall = false
     
     func run() throws {
         let manager = InputManager.shared
+        let serviceManager = ServiceManager()
         
         if list {
             // List available input sources
@@ -70,41 +65,23 @@ struct Puck: ParsableCommand {
             return
         }
         
-        // Service management commands
-        let serviceManager = ServiceManager()
-        
-        if installService {
-            print("Installing launchd service...")
-            try serviceManager.install()
-            try serviceManager.start()
+        if status {
+            let isInstalled = serviceManager.isInstalled()
+            let isRunning = serviceManager.isRunning()
+            
+            print("Service status:")
+            print("  Installed: \(isInstalled ? "Yes" : "No")")
+            print("  Running: \(isRunning ? "Yes" : "No")")
             return
         }
         
-        if uninstallService {
-            print("Uninstalling launchd service...")
+        if uninstall {
+            print("Uninstalling service...")
             try serviceManager.uninstall()
             return
         }
         
-        if startService {
-            print("Starting service...")
-            try serviceManager.start()
-            return
-        }
-        
-        if stopService {
-            print("Stopping service...")
-            try serviceManager.stop()
-            return
-        }
-        
-        if restartService {
-            print("Restarting service...")
-            try serviceManager.restart()
-            return
-        }
-        
-        // Default behavior: start in foreground if not running as service
+        // Default behavior: ensure service is installed and running
         let configPath = config ?? "\(NSHomeDirectory())/.config/puck/puckrc"
         
         // Check if config file exists
@@ -114,10 +91,10 @@ struct Puck: ParsableCommand {
             return
         }
         
-        do {
+        // If --foreground flag is set, run in foreground
+        if foreground {
             let inputManager = try InputMethodManager(configPath: configPath)
             print("Starting Puck in foreground mode with configuration from \(configPath)")
-            print("Use --install-service to run as a background service")
             
             guard inputManager.start() else {
                 print("Error: Failed to start input method manager. Make sure you have accessibility permissions enabled.")
@@ -126,9 +103,26 @@ struct Puck: ParsableCommand {
             
             // Keep the program running
             RunLoop.current.run()
-        } catch {
-            print("Error: Failed to initialize input method manager: \(error)")
+            return
         }
+
+        do {
+            // If not installed, install and start the service
+            if !serviceManager.isInstalled() {
+                print("Installing service...")
+                try serviceManager.install()
+            }
+            
+            if !serviceManager.isRunning() {
+                print("Starting service...")
+                try serviceManager.start()
+            } else {
+                print("Service is running. Use 'puck --status' to check status.")
+            }
+        } catch {
+            print("Error: \(error)")
+        }
+        Foundation.exit(0)
     }
 }
 

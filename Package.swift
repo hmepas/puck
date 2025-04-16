@@ -30,7 +30,7 @@ let package = Package(
             ],
             path: "Sources/Puck",
             resources: [
-                .copy("Resources/com.puck.daemon.plist")
+                .copy("com.puck.daemon.plist")
             ]
         ),
         // Tests
