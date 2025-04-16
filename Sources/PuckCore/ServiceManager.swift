@@ -47,7 +47,7 @@ public class ServiceManager {
         let plistPath = (launchAgentPath as NSString).appendingPathComponent("\(launchAgentName).plist")
         try PlistTemplate.generate(executablePath: executablePath).write(toFile: plistPath, atomically: true, encoding: .utf8)
         
-        let result = ProcessUtils.shell("launchctl", "load", plistPath)
+        let result = ProcessUtils.shell("/bin/launchctl", "load", plistPath)
         if result.status != 0 {
             throw ServiceError.commandFailed("Failed to load service: \(result.output)")
         }
@@ -70,7 +70,7 @@ public class ServiceManager {
             throw ServiceError.invalidState("Service not installed. Please install first.")
         }
         
-        let result = ProcessUtils.shell("launchctl", "load", plistPath)
+        let result = ProcessUtils.shell("/bin/launchctl", "load", plistPath)
         if result.status != 0 {
             throw ServiceError.commandFailed("Failed to start service: \(result.output)")
         }
@@ -84,7 +84,7 @@ public class ServiceManager {
             return
         }
         
-        let result = ProcessUtils.shell("launchctl", "unload", plistPath)
+        let result = ProcessUtils.shell("/bin/launchctl", "unload", plistPath)
         if result.status != 0 {
             throw ServiceError.commandFailed("Failed to stop service: \(result.output)")
         }
@@ -115,7 +115,7 @@ public class ServiceManager {
     public func isRunning() -> Bool {
         // If service is installed, check if it's actually running via launchctl
         if isInstalled() {
-            let result = ProcessUtils.shell("launchctl", "list")
+            let result = ProcessUtils.shell("/bin/launchctl", "list")
             
             // Parse launchctl output to find our service and its PID
             let serviceInfo = result.output.split(separator: "\n")
