@@ -41,9 +41,20 @@ ctrl + alt - p : com.apple.keylayout.US
 ### Find input source IDs using 'puck -l'
 ### Find key names using 'puck -o'
 
-## Installation (Planned)
+## Installation
 
-Instructions for building from source using Swift Package Manager and potentially Homebrew will be added here.
+### Via Homebrew
+
+```bash
+brew tap hmepas/puck
+brew install puck
+```
+
+### Prerequisites
+
+- macOS
+- Xcode 14.0 or later (will be installed automatically via Homebrew if not present)
+- Accessibility permissions (required for input source switching)
 
 ## Dependencies
 
