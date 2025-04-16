@@ -71,6 +71,7 @@ struct Puck: ParsableCommand {
             return
         }
         
+        // Service management commands
         if installService {
             print("Installing launchd service...")
             // TODO: Implement service installation
@@ -102,7 +103,28 @@ struct Puck: ParsableCommand {
         }
         
         // Default behavior: start the daemon
-        print("Starting Puck daemon...")
-        // TODO: Implement daemon mode
+        let configPath = config ?? "\(NSHomeDirectory())/.config/puck/puckrc"
+        
+        // Check if config file exists
+        if !FileManager.default.fileExists(atPath: configPath) {
+            print("Error: Configuration file not found at \(configPath)")
+            print("Please create a configuration file or specify a custom path with --config")
+            return
+        }
+        
+        do {
+            let inputManager = try InputMethodManager(configPath: configPath)
+            print("Starting Puck daemon with configuration from \(configPath)")
+            
+            guard inputManager.start() else {
+                print("Error: Failed to start input method manager. Make sure you have accessibility permissions enabled.")
+                return
+            }
+            
+            // Keep the program running
+            RunLoop.current.run()
+        } catch {
+            print("Error: Failed to initialize input method manager: \(error)")
+        }
     }
 } 

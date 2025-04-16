@@ -1,0 +1,15 @@
+# Example configuration for Puck
+# Format: <modifiers> - <key> : <input_source_id>
+# Modifiers: cmd, ctrl, alt, shift
+# Use 'puck -o' to see key names
+# Use 'puck -l' to see input source IDs
+
+# Switch to US layout with Cmd+Space
+cmd - space : com.apple.keylayout.US
+
+# Switch to Russian layout with Cmd+Shift+Space
+cmd + shift - space : com.apple.keylayout.Russian
+
+# Cycle between Russian and US layouts with Ctrl+Alt+P
+ctrl + alt - p : com.apple.keylayout.Russian
+ctrl + alt - p : com.apple.keylayout.US 
