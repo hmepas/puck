@@ -1,5 +1,4 @@
 import Foundation
-@_implementationOnly import Foundation
 
 public enum ResourceError: Error {
     case resourceNotFound(String)
@@ -7,14 +6,8 @@ public enum ResourceError: Error {
 
 public struct ResourceLoader {
     public static func loadPlistContent() throws -> String {
-        // First try environment variable
+        // Try environment variable
         if let path = ProcessInfo.processInfo.environment["PUCK_RESOURCE_PATH"],
-           let content = try? String(contentsOfFile: path, encoding: .utf8) {
-            return content
-        }
-        
-        // Then try bundle
-        if let path = Bundle.module.path(forResource: "com.puck.daemon", ofType: "plist"),
            let content = try? String(contentsOfFile: path, encoding: .utf8) {
             return content
         }
