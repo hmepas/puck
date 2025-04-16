@@ -52,7 +52,22 @@ struct Puck: ParsableCommand {
             print("Starting key observation mode...")
             print("Press keys to see their names and modifiers.")
             print("Press Ctrl+C to exit.")
-            // TODO: Implement key observation
+            
+            let monitor = KeyboardMonitor { key, modifiers in
+                if !modifiers.isEmpty {
+                    print("\(modifiers.joined(separator: " + ")) + \(key)")
+                } else {
+                    print(key)
+                }
+            }
+            
+            guard monitor.start() else {
+                print("Error: Failed to start key monitoring. Make sure you have accessibility permissions enabled.")
+                return
+            }
+            
+            // Keep the program running
+            RunLoop.current.run()
             return
         }
         
