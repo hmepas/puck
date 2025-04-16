@@ -28,9 +28,25 @@ struct Puck: ParsableCommand {
     @Flag(name: .shortAndLong, help: "Uninstall the service")
     var uninstall = false
     
-    func run() throws {
+    private lazy var serviceManager: ServiceManager = {
+        // Load plist content
+        guard let plistURL = Bundle.module.url(forResource: "com.puck.daemon", withExtension: "plist") else {
+            fatalError("Could not find plist file in bundle")
+        }
+        
+        let plistContent: String
+        do {
+            plistContent = try String(contentsOf: plistURL, encoding: .utf8)
+        } catch {
+            fatalError("Could not read plist file: \(error)")
+        }
+        
+        let executablePath = ProcessInfo.processInfo.arguments[0]
+        return ServiceManager(plistContent: plistContent, executablePath: executablePath)
+    }()
+    
+    mutating func run() throws {
         let manager = InputManager.shared
-        let serviceManager = ServiceManager()
         
         if list {
             // List available input sources
@@ -107,6 +123,12 @@ struct Puck: ParsableCommand {
         }
 
         do {
+            // Check if already running in foreground mode
+            if serviceManager.isProcessRunning() {
+                print("Puck is already running in foreground mode.")
+                return
+            }
+            
             // If not installed, install and start the service
             if !serviceManager.isInstalled() {
                 print("Installing service...")
@@ -117,7 +139,7 @@ struct Puck: ParsableCommand {
                 print("Starting service...")
                 try serviceManager.start()
             } else {
-                print("Service is running. Use 'puck --status' to check status.")
+                print("Service is already running.")
             }
         } catch {
             print("Error: \(error)")

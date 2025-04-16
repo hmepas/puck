@@ -1,48 +1,89 @@
 import Foundation
 import ServiceManagement
 
+#if canImport(SwiftUI)
+import SwiftUI
+#endif
+
+private extension Bundle {
+    static var current: Bundle {
+        #if canImport(SwiftUI)
+        return Bundle.main
+        #else
+        return Bundle.module
+        #endif
+    }
+}
+
 public enum ServiceError: Error {
     case fileOperationFailed(String)
     case commandFailed(String)
     case invalidState(String)
     case systemError(String)
+    case plistNotFound
+    case installFailed
+    case uninstallFailed
+    case startFailed
+    case stopFailed
+    case restartFailed
 }
 
 public class ServiceManager {
     private let launchAgentName = "com.puck.daemon"
     private let launchAgentPath: String
     private let executablePath: String
+    private let plistContent: String
     
-    public init() {
+    public init(plistContent: String, executablePath: String? = nil) {
         self.launchAgentPath = "\(NSHomeDirectory())/Library/LaunchAgents/\(launchAgentName).plist"
-        // Get the path to the current executable
-        self.executablePath = Bundle.main.executablePath ?? "/usr/local/bin/puck"
+        self.executablePath = executablePath ?? ProcessInfo.processInfo.arguments[0]
+        self.plistContent = plistContent
     }
     
     public func install() throws {
+        // Check accessibility permissions first
+        guard AXIsProcessTrusted() else {
+            print("Warning: Accessibility permissions are not granted.")
+            print("Please grant accessibility permissions in System Settings -> Privacy & Security -> Accessibility")
+            print("After granting permissions, try installing the service again.")
+            throw ServiceError.invalidState("Accessibility permissions required")
+        }
+        
         // Create LaunchAgents directory if it doesn't exist
         try FileManager.default.createDirectory(
             atPath: "\(NSHomeDirectory())/Library/LaunchAgents",
             withIntermediateDirectories: true
         )
         
-        // Copy plist file to LaunchAgents
-        guard let plistSource = Bundle.main.path(forResource: "com.puck.daemon", ofType: "plist") else {
-            throw ServiceError.fileOperationFailed("Could not find plist file in bundle")
+        print("Debug: Using executable path: \(executablePath)")
+        
+        // Get working directory (parent directory of executable)
+        let workingDirectory = (executablePath as NSString).deletingLastPathComponent
+        print("Debug: Using working directory: \(workingDirectory)")
+        
+        // Update plist content with correct paths
+        var plistDict = try PropertyListSerialization.propertyList(
+            from: plistContent.data(using: .utf8)!,
+            options: [],
+            format: nil
+        ) as! [String: Any]
+        
+        // Update paths
+        if var programArgs = plistDict["ProgramArguments"] as? [String] {
+            programArgs[0] = executablePath
+            plistDict["ProgramArguments"] = programArgs
         }
+        plistDict["WorkingDirectory"] = workingDirectory
         
-        // Update plist with correct executable path
-        let plistContent = try String(contentsOfFile: plistSource, encoding: .utf8)
-        let updatedContent = plistContent.replacingOccurrences(
-            of: "/usr/local/bin/puck",
-            with: executablePath
+        // Convert back to XML
+        let updatedContent = try PropertyListSerialization.data(
+            fromPropertyList: plistDict,
+            format: .xml,
+            options: 0
         )
         
-        try updatedContent.write(
-            toFile: launchAgentPath,
-            atomically: true,
-            encoding: .utf8
-        )
+        // Write updated plist
+        try updatedContent.write(to: URL(fileURLWithPath: launchAgentPath), options: .atomic)
         
         print("Service installed at \(launchAgentPath)")
     }
@@ -62,7 +103,7 @@ public class ServiceManager {
             throw ServiceError.invalidState("Service not installed. Please install first.")
         }
         
-        let result = shell("/bin/launchctl", "load", launchAgentPath)
+        let result = ProcessUtils.shell("/bin/launchctl", "load", launchAgentPath)
         if result.status != 0 {
             throw ServiceError.commandFailed("Failed to start service: \(result.output)")
         }
@@ -75,7 +116,7 @@ public class ServiceManager {
             return
         }
         
-        let result = shell("/bin/launchctl", "unload", launchAgentPath)
+        let result = ProcessUtils.shell("/bin/launchctl", "unload", launchAgentPath)
         if result.status != 0 {
             throw ServiceError.commandFailed("Failed to stop service: \(result.output)")
         }
@@ -94,94 +135,37 @@ public class ServiceManager {
         return FileManager.default.fileExists(atPath: launchAgentPath)
     }
     
+    public func isProcessRunning() -> Bool {
+        return ProcessUtils.isProcessRunning(
+            name: "Puck",
+            arguments: ["-f"],
+            excludePatterns: ["grep"]
+        )
+    }
+    
     public func isRunning() -> Bool {
-        // Check if running as a direct process first
-        if isProcessRunning() {
-            return true
-        }
-        
-        // Then check if running as a service
-        let result = shell("/bin/launchctl", "list", launchAgentName)
-        return result.status == 0
-    }
-    
-    private func isProcessRunning() -> Bool {
-        let type = UInt32(PROC_ALL_PIDS)
-        var pids = [Int32](repeating: 0, count: 2048)
-        var found = false
-        
-        pids.withUnsafeMutableBufferPointer { buffer in
-            let size = Int32(buffer.count * MemoryLayout<pid_t>.size)
-            let count = proc_listpids(type, 0, buffer.baseAddress, size)
-            guard count > 0 else {
-                return
-            }
+        // If service is installed, check if it's actually running via launchctl
+        if isInstalled() {
+            let result = ProcessUtils.shell("/bin/launchctl", "list")
             
-            let currentPid = ProcessInfo.processInfo.processIdentifier
+            // Parse launchctl output to find our service and its PID
+            let serviceInfo = result.output.split(separator: "\n")
+                .map { String($0) }
+                .first { line in 
+                    line.contains(launchAgentName) 
+                }
             
-            for i in 0..<Int(count) {
-                let pid = buffer[i]
-                if pid <= 0 || pid == currentPid {
-                    continue
-                }
-                
-                var pathBuffer = [Int8](repeating: 0, count: Int(MAXPATHLEN))
-                let pathLength = proc_pidpath(pid, &pathBuffer, UInt32(pathBuffer.count))
-                
-                if pathLength > 0 {
-                    let procPath = String(cString: pathBuffer)
-                    if procPath.contains("Puck") {
-                        found = true
-                        return
-                    }
+            // If service found and has non-zero PID, it's running
+            if let info = serviceInfo {
+                let parts = info.split(separator: "\t")
+                if parts.count >= 1, let pid = Int(parts[0]), pid > 0 {
+                    return true
                 }
             }
+            return false
         }
         
-        return found
-    }
-    
-    private func proc_name(_ pid: Int32, _ buffer: UnsafeMutablePointer<Int8>, _ bufferSize: UInt32) {
-        var name = [Int32](repeating: 0, count: 4)
-        name[0] = CTL_KERN
-        name[1] = KERN_PROC
-        name[2] = KERN_PROC_PID
-        name[3] = pid
-        
-        var info = kinfo_proc()
-        var size = MemoryLayout<kinfo_proc>.size
-        
-        let result = sysctl(&name, 4, &info, &size, nil, 0)
-        if result == 0 {
-            withUnsafeBytes(of: info.kp_proc.p_comm) { ptr in
-                let data = ptr.bindMemory(to: Int8.self)
-                for i in 0..<min(Int(bufferSize) - 1, data.count) {
-                    buffer[i] = data[i]
-                }
-            }
-        }
-    }
-    
-    private func shell(_ args: String...) -> (status: Int32, output: String) {
-        let task = Process()
-        let pipe = Pipe()
-        
-        task.standardOutput = pipe
-        task.standardError = pipe
-        task.arguments = Array(args.dropFirst())
-        task.executableURL = URL(fileURLWithPath: args[0])
-        
-        do {
-            try task.run()
-        } catch {
-            return (1, error.localizedDescription)
-        }
-        
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let output = String(data: data, encoding: .utf8) ?? ""
-        
-        task.waitUntilExit()
-        
-        return (task.terminationStatus, output)
+        // Otherwise check for direct process
+        return isProcessRunning()
     }
 } 
