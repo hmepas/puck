@@ -22,10 +22,26 @@ Puck is a lightweight daemon for macOS designed to provide fast and configurable
 *   `puck -u` or `puck --uninstall`: Uninstall the service.
 *   `puck -c <path>` or `puck --config <path>`: Use a specific configuration file path.
 *   `puck -v` or `puck --version`: Show version information.
+*   `puck --log-level <level>`: Set log level (`trace|debug|info|notice|warning|error|critical`).
+*   `puck --log-file <path>`: Log file path (default `~/Library/Logs/Puck/puck.log`).
 
 The default configuration file location is `~/.config/puck/puckrc`. You need to create this file before running the service.
 
 Note: The application requires accessibility permissions to function. You will be prompted to grant these permissions in System Settings -> Privacy & Security -> Accessibility when installing the service.
+
+### Logging
+
+By default, logs go to `~/Library/Logs/Puck/puck.log` (created automatically). You can change location with `--log-file` and verbosity with `--log-level`.
+
+Examples:
+
+```bash
+# Run foreground with verbose logging
+puck -f --log-level debug --log-file ~/.local/state/puck/puck-debug.log
+
+# Check service status with additional logs
+puck --status --log-level notice
+```
 
 ## Configuration (`~/.config/puck/puckrc`)
 

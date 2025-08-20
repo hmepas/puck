@@ -1,5 +1,6 @@
 import Foundation
 import Carbon
+import Logging
 
 public class KeyboardMonitor {
     public typealias KeyEventHandler = (String, [String]) -> Void
@@ -33,6 +34,7 @@ public class KeyboardMonitor {
             },
             userInfo: Unmanaged.passUnretained(self).toOpaque()
         ) else {
+            PuckLogger.shared.error("Failed to create event tap. Accessibility permission?")
             return false
         }
         
@@ -43,6 +45,7 @@ public class KeyboardMonitor {
         CGEvent.tapEnable(tap: tap, enable: true)
         
         self.runLoopSource = runLoopSource
+        PuckLogger.shared.debug("Event tap installed")
         return true
     }
     
@@ -57,6 +60,7 @@ public class KeyboardMonitor {
         
         eventTap = nil
         runLoopSource = nil
+        PuckLogger.shared.debug("Event tap stopped")
     }
     
     private func handleKeyEvent(_ event: CGEvent) {
@@ -72,6 +76,7 @@ public class KeyboardMonitor {
         // Convert keycode to string representation
         let keyString = keycodeToString(keycode)
         
+        PuckLogger.shared.trace("keyDown: keycode=\(keycode) key=\(keyString) flags=\(flags.rawValue)")
         eventHandler(keyString, modifiers)
     }
     

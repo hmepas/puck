@@ -1,5 +1,6 @@
 import Foundation
 import PuckCore
+import Logging
 import ArgumentParser
 import Carbon
 
@@ -28,6 +29,12 @@ struct Puck: ParsableCommand {
     @Flag(name: .shortAndLong, help: "Uninstall the service")
     var uninstall = false
     
+    @Option(name: [.customLong("log-level")], help: "Log level: trace, debug, info, notice, warning, error, critical")
+    var logLevel: String?
+    
+    @Option(name: [.customLong("log-file")], help: "Log file path (default: ~/Library/Logs/Puck/puck.log)")
+    var logFile: String?
+    
     private lazy var serviceManager: ServiceManager = {
         // Load plist content
         let plistContent = ResourceLoader.loadPlistContent()
@@ -36,6 +43,13 @@ struct Puck: ParsableCommand {
     }()
     
     mutating func run() throws {
+        // Configure logging
+        let level = logLevel.flatMap { Logger.Level(rawValue: $0) } ?? .info
+        let defaultLogPath = "~/Library/Logs/Puck/puck.log"
+        let filePath = logFile ?? defaultLogPath
+        PuckLogger.configure(level: level, toFile: filePath)
+        var logger = PuckLogger.shared
+        logger[metadataKey: "pid"] = "\(getpid())"
         let manager = InputManager.shared
         
         if list {
@@ -49,7 +63,7 @@ struct Puck: ParsableCommand {
         }
         
         if observe {
-            print("Starting key observation mode...")
+            logger.info("Starting key observation mode…")
             print("Press keys to see their names and modifiers.")
             print("Press Ctrl+C to exit.")
             
@@ -62,7 +76,7 @@ struct Puck: ParsableCommand {
             }
             
             guard monitor.start() else {
-                print("Error: Failed to start key monitoring. Make sure you have accessibility permissions enabled.")
+                logger.error("Failed to start key monitoring. Accessibility permissions missing?")
                 return
             }
             
@@ -82,7 +96,7 @@ struct Puck: ParsableCommand {
         }
         
         if uninstall {
-            print("Uninstalling service...")
+            logger.info("Uninstalling service…")
             try serviceManager.uninstall()
             return
         }
@@ -92,7 +106,7 @@ struct Puck: ParsableCommand {
         
         // Check if config file exists
         if !FileManager.default.fileExists(atPath: configPath) {
-            print("Error: Configuration file not found at \(configPath)")
+            logger.error("Configuration file not found at \(configPath)")
             print("Please create a configuration file or specify a custom path with --config")
             return
         }
@@ -100,10 +114,10 @@ struct Puck: ParsableCommand {
         // If --foreground flag is set, run in foreground
         if foreground {
             let inputManager = try InputMethodManager(configPath: configPath)
-            print("Starting Puck in foreground mode with configuration from \(configPath)")
+            logger.info("Starting Puck in foreground mode with configuration from \(configPath)")
             
             guard inputManager.start() else {
-                print("Error: Failed to start input method manager. Make sure you have accessibility permissions enabled.")
+                logger.error("Failed to start input method manager. Accessibility permissions missing?")
                 return
             }
             
@@ -115,24 +129,24 @@ struct Puck: ParsableCommand {
         do {
             // Check if already running in foreground mode
             if serviceManager.isProcessRunning() {
-                print("Puck is already running in foreground mode.")
+                logger.notice("Puck is already running in foreground mode.")
                 return
             }
             
             // If not installed, install and start the service
             if !serviceManager.isInstalled() {
-                print("Installing service...")
+                logger.info("Installing service…")
                 try serviceManager.install()
             }
             
             if !serviceManager.isRunning() {
-                print("Starting service...")
+                logger.info("Starting service…")
                 try serviceManager.start()
             } else {
-                print("Service is already running.")
+                logger.info("Service is already running.")
             }
         } catch {
-            print("Error: \(error)")
+            logger.error("\(String(describing: error))")
         }
         Foundation.exit(0)
     }

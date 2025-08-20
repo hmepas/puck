@@ -26,7 +26,8 @@ let package = Package(
             name: "Puck",
             dependencies: [
                 "PuckCore",
-                .product(name: "ArgumentParser", package: "swift-argument-parser")
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "Logging", package: "swift-log")
             ],
             path: "Sources/Puck"
         ),

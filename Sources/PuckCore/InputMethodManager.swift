@@ -1,5 +1,6 @@
 import Foundation
 import Carbon
+import Logging
 
 public class InputMethodManager {
     private let configManager: ConfigurationManager
@@ -21,6 +22,7 @@ public class InputMethodManager {
         let success = keyboardMonitor.start()
         if success {
             isRunning = true
+            PuckLogger.shared.info("Keyboard monitor started")
         }
         return success
     }
@@ -34,9 +36,10 @@ public class InputMethodManager {
     
     private func handleKeyEvent(keyString: String, modifiers: [String]) {
         let hotkey = ConfigHotkey.from(keyString: keyString, modifiers: modifiers)
-        
+        PuckLogger.shared.debug("Key event: key=\(keyString) modifiers=\(modifiers.joined(separator: "+"))")
         // Get the next action for this hotkey (handles both single actions and cycles)
         guard let action = configManager.nextActionInCycle(for: hotkey) else {
+            PuckLogger.shared.debug("No action configured for this hotkey")
             return
         }
         
@@ -45,13 +48,16 @@ public class InputMethodManager {
     
     private func switchToInputSource(withID id: String) {
         guard let inputSource = TISInputSource.inputSource(withID: id) else {
-            print("Error: Input source with ID '\(id)' not found")
+            PuckLogger.shared.error("Input source with ID '\(id)' not found")
             return
         }
         
         let result = inputSource.select()
         if !result {
-            print("Error: Failed to switch to input source '\(id)'")
+            PuckLogger.shared.error("Failed to switch to input source '\(id)'")
+        } else {
+            let name = SystemInputSource(inputSource).localizedName ?? "?"
+            PuckLogger.shared.info("Switched to input source id=\(id) name=\(name)")
         }
     }
 } 
