@@ -3,13 +3,15 @@ import Carbon
 import Logging
 
 public class KeyboardMonitor {
-    public typealias KeyEventHandler = (String, [String]) -> Void
+    public typealias KeyEventHandler = (String, [String]) -> Bool
     
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private let eventHandler: KeyEventHandler
+    private let consumeHandledEvents: Bool
     
-    public init(eventHandler: @escaping KeyEventHandler) {
+    public init(consumeHandledEvents: Bool = false, eventHandler: @escaping KeyEventHandler) {
+        self.consumeHandledEvents = consumeHandledEvents
         self.eventHandler = eventHandler
     }
     
@@ -26,10 +28,33 @@ public class KeyboardMonitor {
             callback: { (proxy, type, event, refcon) -> Unmanaged<CGEvent>? in
                 let monitor = Unmanaged<KeyboardMonitor>.fromOpaque(refcon!).takeUnretainedValue()
                 
-                if type == .keyDown {
-                    monitor.handleKeyEvent(event)
+                // Handle tap disabled events by re-enabling immediately
+                if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+                    if let tap = monitor.eventTap {
+                        PuckLogger.shared.notice("Event tap disabled (\(type.rawValue)); re-enabling…")
+                        CGEvent.tapEnable(tap: tap, enable: true)
+                    }
+                    return Unmanaged.passRetained(event)
                 }
-                
+
+                // Only process keyDown
+                guard type == .keyDown else {
+                    return Unmanaged.passRetained(event)
+                }
+
+                // Ignore auto-repeat keyDowns to avoid chattering
+                let isAutoRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) == 1
+                if isAutoRepeat {
+                    PuckLogger.shared.trace("Ignoring autorepeat keyDown")
+                    return Unmanaged.passRetained(event)
+                }
+
+                let handled = monitor.handleKeyEvent(event)
+                if handled && monitor.consumeHandledEvents {
+                    // Swallow the event so it doesn't reach the focused app / system
+                    return nil
+                }
+
                 return Unmanaged.passRetained(event)
             },
             userInfo: Unmanaged.passUnretained(self).toOpaque()
@@ -63,7 +88,7 @@ public class KeyboardMonitor {
         PuckLogger.shared.debug("Event tap stopped")
     }
     
-    private func handleKeyEvent(_ event: CGEvent) {
+    private func handleKeyEvent(_ event: CGEvent) -> Bool {
         let keycode = event.getIntegerValueField(.keyboardEventKeycode)
         let flags = event.flags
         
@@ -77,7 +102,7 @@ public class KeyboardMonitor {
         let keyString = keycodeToString(keycode)
         
         PuckLogger.shared.trace("keyDown: keycode=\(keycode) key=\(keyString) flags=\(flags.rawValue)")
-        eventHandler(keyString, modifiers)
+        return eventHandler(keyString, modifiers)
     }
     
     private func keycodeToString(_ keycode: Int64) -> String {

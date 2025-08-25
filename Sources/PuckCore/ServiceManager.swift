@@ -36,7 +36,9 @@ public class ServiceManager {
     
     public init(plistContent: String, executablePath: String) {
         self.plistContent = plistContent
-        self.executablePath = executablePath
+        // Resolve any symlinks so TCC permissions match the actual binary path
+        let resolved = URL(fileURLWithPath: executablePath).resolvingSymlinksInPath().path
+        self.executablePath = resolved
         self.launchAgentPath = "\(NSHomeDirectory())/Library/LaunchAgents"
     }
     

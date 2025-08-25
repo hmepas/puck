@@ -9,6 +9,8 @@ public struct PlistTemplate {
         <dict>
             <key>Label</key>
             <string>com.puck.daemon</string>
+            <key>LimitLoadToSessionType</key>
+            <string>Aqua</string>
             <key>ProgramArguments</key>
             <array>
                 <string>\(executablePath)</string>

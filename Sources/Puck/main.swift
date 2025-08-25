@@ -67,12 +67,13 @@ struct Puck: ParsableCommand {
             print("Press keys to see their names and modifiers.")
             print("Press Ctrl+C to exit.")
             
-            let monitor = KeyboardMonitor { key, modifiers in
+            let monitor = KeyboardMonitor(consumeHandledEvents: false) { key, modifiers in
                 if !modifiers.isEmpty {
                     print("\(modifiers.joined(separator: " + ")) + \(key)")
                 } else {
                     print(key)
                 }
+                return false // never consume in observe mode
             }
             
             guard monitor.start() else {
