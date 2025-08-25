@@ -8,7 +8,7 @@ struct Puck: ParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "puck",
         abstract: "A swift input method switching daemon for macOS",
-        version: "0.1.0"
+        version: "0.1.9"
     )
     
     @Flag(name: .shortAndLong, help: "List all available input sources")
