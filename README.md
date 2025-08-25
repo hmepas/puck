@@ -77,6 +77,99 @@ brew install puck
 *   Swift Package Manager
 *   Xcode Command Line Tools
 
+## Development (Build & Test)
+
+Build, run tests, and try the binary locally:
+
+```bash
+# Build
+swift build
+
+# Run tests
+swift test
+
+# Run locally (debug build)
+.build/debug/puck --version
+.build/debug/puck --list
+.build/debug/puck --foreground --log-level debug
+```
+
+Tip: when installed via Homebrew, the binary is at `/opt/homebrew/bin/puck`.
+
+## Accessibility (Permissions)
+
+Puck needs Accessibility permission to observe keyboard events. If permission is missing, you'll see a log: "Failed to create event tap. Accessibility permission?".
+
+Grant permission:
+
+1. Open System Settings → Privacy & Security → Accessibility.
+2. Unlock the panel with your password.
+3. Ensure your terminal app (Terminal/iTerm2) is enabled if you run Puck in foreground.
+4. For the background service, look for `puck` in the list and enable it. If it's not listed yet, run `puck` once to trigger the prompt, then return and enable it.
+5. If needed, add it manually with the + button and select `/opt/homebrew/bin/puck`.
+
+After changing permissions, restart the app or service:
+
+```bash
+puck --uninstall
+puck        # installs and starts the service
+```
+
+## Release: Version bump and Homebrew update
+
+This project is distributed via a Homebrew tap at `hmepas/puck`. To release a new version X.Y.Z:
+
+1) In this repo (puck): bump version and tag
+
+```bash
+# Edit version in CLI configuration
+sed -i '' 's/^\( *version: \)"[^"]*"/\1"X.Y.Z"/' Sources/Puck/main.swift
+
+# Build and test
+swift build && swift test
+
+# Commit
+git add Sources/Puck/main.swift
+git commit -m "chore(release): bump version to X.Y.Z in CLI"
+
+# Re-tag (delete if exists, then create and push)
+git tag -d vX.Y.Z || true
+git tag vX.Y.Z
+git push -f origin vX.Y.Z
+
+# Compute tarball sha256 for the Homebrew formula
+curl -L -s -o /tmp/puck-vX.Y.Z.tar.gz \
+  https://github.com/hmepas/puck/archive/refs/tags/vX.Y.Z.tar.gz
+shasum -a 256 /tmp/puck-vX.Y.Z.tar.gz | awk '{print $1}'
+```
+
+2) In the Homebrew tap repo (`/Users/hmepas/Cursor/homebrew-puck`): update formula
+
+```bash
+cd /Users/hmepas/Cursor/homebrew-puck
+
+# Update URL and sha256 (replace placeholders)
+sed -i '' 's|/v[0-9]\+\.[0-9]\+\.[0-9]\+\.tar\.gz|/vX.Y.Z.tar.gz|' puck.rb
+sed -i '' 's|^\( *sha256 \)".*"|\1"<NEW_SHA256_FROM_ABOVE>"|' puck.rb
+
+git add puck.rb
+git commit -m "puck X.Y.Z: bump to vX.Y.Z (url+sha256)"
+git push origin main
+
+# Update locally and reinstall
+brew update
+brew reinstall puck
+
+# Verify
+puck --version   # should print X.Y.Z
+```
+
+Notes:
+
+- Replace `X.Y.Z` and `<NEW_SHA256_FROM_ABOVE>` accordingly.
+- Ensure the app runs and `puck --status` shows the service running.
+- Keep the CLI `version` in `Sources/Puck/main.swift` in sync with the Homebrew formula.
+
 ## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request.
