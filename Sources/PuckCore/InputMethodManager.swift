@@ -60,11 +60,12 @@ public class InputMethodManager {
             return false
         }
         
-        let switched = switchToInputSource(withID: action.inputSourceID)
-        if switched {
-            lastHandledAtByHotkey[hotkey] = now
+        // Perform selection on main thread; TIS calls from CGEvent tap thread can be flaky for IMEs.
+        lastHandledAtByHotkey[hotkey] = now
+        DispatchQueue.main.async { [weak self] in
+            _ = self?.switchToInputSource(withID: action.inputSourceID)
         }
-        return switched
+        return true
     }
     
     private func switchToInputSource(withID id: String) -> Bool {
@@ -73,14 +74,32 @@ public class InputMethodManager {
             return false
         }
         
-        let result = inputSource.select()
-        if !result {
+        // Input methods can have multiple input modes (e.g., Pinyin vs ASCII).
+        // Choose a non-ASCII input mode when available and clear overrides.
+        if inputSource.isInputMethod {
+            TISSetInputMethodKeyboardLayoutOverride(nil)
+            
+            let modes = TISInputSource.inputModes(forInputSourceID: id)
+            // Prefer a mode that does not look like ASCII/ABC/Latin
+            let preferredMode = modes.first { mode in
+                guard let modeID = mode.inputModeID?.lowercased() else { return false }
+                return !(modeID.contains("abc") || modeID.contains("latin") || modeID.contains("english"))
+            } ?? modes.first
+            
+            if let modeSource = preferredMode {
+                if !modeSource.select() {
+                    PuckLogger.shared.warning("Failed to select input mode for '\(id)'")
+                }
+            }
+        }
+        
+        guard inputSource.select() else {
             PuckLogger.shared.error("Failed to switch to input source '\(id)'")
             return false
-        } else {
-            let name = SystemInputSource(inputSource).localizedName ?? "?"
-            PuckLogger.shared.info("Switched to input source id=\(id) name=\(name)")
-            return true
         }
+        
+        let name = SystemInputSource(inputSource).localizedName ?? "?"
+        PuckLogger.shared.info("Switched to input source id=\(id) name=\(name)")
+        return true
     }
-} 
+}
